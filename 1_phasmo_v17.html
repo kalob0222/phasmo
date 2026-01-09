@@ -1,0 +1,1888 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Phasmo Decision Assistant — Tabbed Layout (v19)</title>
+  <style>
+    :root{
+      --bg:#070a12;
+      --border:rgba(255,255,255,.10);
+      --muted:rgba(255,255,255,.72);
+      --muted2:rgba(255,255,255,.55);
+      --text:rgba(255,255,255,.93);
+      --good:#2bd2a6;
+      --bad:#ff5d73;
+      --warn:#ffd166;
+      --chip:rgba(255,255,255,.07);
+      --shadow: 0 14px 40px rgba(0,0,0,.55);
+      --radius:18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: var(--sans);
+      background:
+        radial-gradient(1100px 700px at 15% 5%, rgba(64,115,255,.13), transparent 60%),
+        radial-gradient(900px 600px at 85% 15%, rgba(43,210,166,.09), transparent 55%),
+        radial-gradient(800px 500px at 50% 95%, rgba(255,93,115,.09), transparent 55%),
+        var(--bg);
+      background-attachment: fixed;
+      background-repeat: no-repeat;
+      color: var(--text);
+    }
+
+    /* Header */
+    .topbar{
+      position: sticky;
+      top:0;
+      z-index:20;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(to bottom, rgba(7,10,18,.95), rgba(7,10,18,.72));
+      border-bottom:1px solid var(--border);
+    }
+    .topbar-inner{
+      max-width: 1250px;
+      margin: 0 auto;
+      padding: 18px 18px;
+      display:flex;
+      gap: 14px;
+      align-items:flex-start;
+      justify-content: space-between;
+    }
+    .brand{ display:flex; flex-direction:column; gap:2px; min-width:260px; }
+    .brand h1{ margin:0; font-size:18px; letter-spacing:.2px; }
+    .brand p{ margin:0; color:var(--muted); font-size:13px; line-height:1.25; }
+
+    .actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+    .btn{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight: 800;
+      font-size: 13px;
+      display:inline-flex;
+      align-items:center;
+      gap: 8px;
+      box-shadow: 0 8px 20px rgba(0,0,0,.25);
+      user-select:none;
+    }
+    .btn:hover{ background: rgba(255,255,255,.08); }
+    .btn:active{ transform: translateY(1px); }
+    .btn.danger{ border-color: rgba(255,93,115,.35); background: rgba(255,93,115,.11); }
+    .btn.primary{ border-color: rgba(64,115,255,.45); background: rgba(64,115,255,.15); }
+    .btn.warn{ border-color: rgba(255,209,102,.35); background: rgba(255,209,102,.14); }
+
+    .select{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      outline: none;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      user-select:none;
+    }
+    .pill.good{ border-color: rgba(43,210,166,.35); background: rgba(43,210,166,.12); color: rgba(255,255,255,.90); }
+    .pill.warn{ border-color: rgba(255,209,102,.35); background: rgba(255,209,102,.12); color: rgba(255,255,255,.92); }
+    .pill.bad{ border-color: rgba(255,93,115,.35); background: rgba(255,93,115,.12); color: rgba(255,255,255,.92); }
+
+    /* Layout */
+    .wrap{ max-width: 1250px; margin:0 auto; padding:18px; padding-bottom:30px; }
+    
+    /* v19 Update: Top grid is 2 cols, fixed height to ensure scrolling */
+    .grid-top{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items:start;
+      height: 480px; /* Fixed height makes panels shorter */
+    }
+    @media (max-width: 1020px){ 
+        .grid-top{ 
+            grid-template-columns:1fr; 
+            height: auto; 
+        } 
+    }
+
+    .full-width-card {
+        margin-top: 14px;
+        width: 100%;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%; 
+    }
+    @media (max-width: 1020px){
+        .grid-top .card {
+            height: 480px; /* Enforce height on mobile stack too */
+        }
+    }
+
+    .card-header{
+      padding: 14px 14px 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .card-header h2{ margin:0; font-size:14px; letter-spacing:.2px; }
+    .card-header .sub{ color: var(--muted2); font-size:12px; margin-top:3px; line-height:1.25; }
+    
+    /* Card Body is now the scroll container */
+    .card-body{ 
+        padding: 14px; 
+        flex-grow: 1; 
+        overflow-y: auto; 
+    }
+
+    /* Tabbed Header Styles */
+    .tab-nav { display: flex; gap: 6px; }
+    .tab-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--muted);
+        padding: 6px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
+    .tab-btn:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    .tab-btn.active {
+        background: rgba(255,255,255,0.1);
+        border-color: rgba(255,255,255,0.1);
+        color: var(--text);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .tab-content { display: none; animation: fadeIn 0.2s ease; }
+    .tab-content.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Evidence section */
+    .evidence-grid{ display:grid; grid-template-columns: 1fr; gap: 10px; }
+    .ev-card{
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      border-radius: 16px;
+      padding: 12px;
+    }
+    .ev-top{ display:flex; align-items:flex-start; justify-content: space-between; gap: 12px; }
+    .ev-name{ font-weight: 950; font-size: 14px; letter-spacing:.15px; line-height: 1.15; margin:0; }
+    .ev-how{ margin-top: 6px; color: var(--muted2); font-size: 12px; line-height: 1.35; }
+
+    /* Buttons */
+    .seg{ display:flex; gap:6px; flex-shrink: 0; }
+    .seg button{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.86);
+      padding: 8px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-size: 12px;
+      font-weight: 950;
+      min-width: 76px;
+      user-select:none;
+    }
+    .seg button:hover{ background: rgba(255,255,255,.08); }
+    .seg button.active.good{ border-color: rgba(43,210,166,.45); background: rgba(43,210,166,.16); color: rgba(255,255,255,.94); }
+    .seg button.active.bad{ border-color: rgba(255,93,115,.45); background: rgba(255,93,115,.16); color: rgba(255,255,255,.94); }
+    .seg button.active.neutral{ border-color: rgba(255,255,255,.16); background: rgba(255,255,255,.08); color: rgba(255,255,255,.92); }
+
+    /* Profile */
+    .profile h3{ margin:0 0 8px 0; font-size:16px; }
+    .badge{
+      display:inline-flex; align-items:center; gap: 6px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10); padding: 6px 9px;
+      font-size: 12px; background: rgba(255,255,255,.05); color: rgba(255,255,255,.88);
+      margin-right: 8px; user-select:none;
+    }
+    .chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .chip{
+      display:inline-flex; align-items:center; gap: 8px; padding: 8px 10px;
+      border-radius: 999px; background: var(--chip); border: 1px solid rgba(255,255,255,.10);
+      color: rgba(255,255,255,.88); font-size: 12px; line-height: 1; cursor: pointer; user-select:none;
+    }
+    .chip:hover{ background: rgba(255,255,255,.09); }
+    .chip .tag{ font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,.72); }
+
+    .section{ margin-top: 14px; }
+    .section h4{ margin:0 0 6px 0; font-size: 13px; color: rgba(255,255,255,.92); }
+    .bullets{ margin:0; padding-left: 18px; color: var(--muted); font-size:12px; line-height: 1.45; }
+
+    /* Lists & Steps */
+    .cand-list{ display:flex; flex-direction:column; gap:8px; max-height:520px; overflow:auto; padding-right:4px; }
+    .cand{
+      border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: rgba(0,0,0,.18);
+      padding: 12px; cursor:pointer; user-select:none;
+    }
+    .cand:hover{ background: rgba(0,0,0,.12); }
+    .cand.active{ border-color: rgba(64,115,255,.45); background: rgba(64,115,255,.12); }
+    .cand-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .cand .title{ font-weight: 950; font-size:13px; margin:0; }
+    .score{ font-family: var(--mono); color: rgba(255,255,255,.72); font-size:12px; }
+
+    .below{ margin-top: 14px; }
+    .steps{ display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:10px; }
+    .step{
+      border: 1px solid rgba(255,255,255,.08); border-radius: 16px;
+      background: rgba(0,0,0,.18); padding: 12px;
+    }
+    .step-title{ font-weight: 950; font-size: 13px; margin:0; }
+    .step-desc{ color: var(--muted); font-size: 12px; margin: 6px 0 0 0; line-height: 1.4; }
+    .step-actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; margin-top: 8px;}
+    .mini{
+      padding: 7px 10px; border-radius: 12px; font-size: 12px; font-weight: 950;
+      border:1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.90); cursor:pointer; user-select:none;
+    }
+    .mini.good{ border-color: rgba(43,210,166,.35); background: rgba(43,210,166,.12); }
+    .mini.bad{ border-color: rgba(255,93,115,.35); background: rgba(255,93,115,.12); }
+    .mini.neutral{ border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: rgba(255,255,255,.86); }
+    .mini:hover{ filter: brightness(1.05); }
+
+    /* Overlays */
+    .overlay{
+      position: fixed; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(8px);
+      z-index: 50; display:none; align-items:center; justify-content:center; padding: 16px;
+    }
+    .overlay.open{ display:flex; }
+    .modal{
+      width: min(1100px, 96vw); max-height: min(86vh, 900px);
+      background: linear-gradient(180deg, rgba(15,20,35,.98), rgba(11,16,32,.98));
+      border: 1px solid rgba(255,255,255,.12); border-radius: 18px;
+      box-shadow: 0 24px 70px rgba(0,0,0,.65); overflow:hidden; display:flex; flex-direction:column;
+    }
+    .modal-head{
+      padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.10);
+      display:flex; align-items:center; justify-content: space-between; gap: 10px;
+    }
+    .modal-head h3{ margin:0; font-size: 14px; }
+    .modal-body{ padding: 14px; overflow:auto; min-height: 0; }
+    .close{
+      border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05);
+      border-radius: 12px; padding: 7px 10px; cursor:pointer; font-weight: 950; user-select:none;
+    }
+
+    /* Tells accordion */
+    details.accordion{
+      border: 1px solid rgba(255,255,255,.10); background: rgba(0,0,0,.14);
+      border-radius: 16px; overflow:hidden; margin-bottom: 10px;
+    }
+    details.accordion > summary{
+      list-style:none; cursor:pointer; padding: 12px 12px; display:flex;
+      align-items:center; justify-content: space-between; gap: 10px;
+      user-select:none; font-weight: 950; font-size: 13px;
+    }
+    details.accordion > summary::-webkit-details-marker{ display:none; }
+    .acc-meta{ color: var(--muted2); font-size: 12px; font-weight: 800; }
+    .acc-body{ padding: 0 12px 12px 12px; }
+
+    .tell-row{
+      display:flex; align-items:flex-start; justify-content: space-between; gap: 10px;
+      padding: 10px 10px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.18);
+      border-radius: 14px; margin-top: 10px;
+    }
+    .tell-left{ min-width: 0; }
+    .tell-title{ font-weight: 950; font-size: 13px; line-height: 1.25; white-space: normal; }
+    .tell-tip{ margin-top: 6px; color: var(--muted2); font-size: 12px; line-height: 1.35; white-space: normal; }
+    .tagline{ margin-top: 6px; display:flex; flex-wrap:wrap; gap: 8px; }
+    .mini-tag{
+      display:inline-flex; align-items:center; gap: 6px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10); padding: 5px 8px; font-size: 11px;
+      color: rgba(255,255,255,.85); background: rgba(255,255,255,.05); user-select:none;
+    }
+    .mini-tag.hard{ border-color: rgba(255,209,102,.35); background: rgba(255,209,102,.12); }
+    .mini-tag.speed{ border-color: rgba(64,115,255,.35); background: rgba(64,115,255,.12); }
+
+    .search{
+      width:100%; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.92); padding: 10px 12px; border-radius: 14px; outline: none;
+      font-size: 13px; margin-bottom: 12px;
+    }
+    .tiny{ font-size:12px; color: var(--muted2); line-height:1.35; }
+
+    /* Tells Panel Scroll Area - v19 Reset */
+    .tells-scroll{ overflow:visible; padding-right:0; height: auto; min-height: 0; }
+
+    ::-webkit-scrollbar{ width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.12); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover{ background: rgba(255,255,255,.18); }
+    .grid-top > *{ min-width: 0; }
+    .ev-card .ev-top{ flex-wrap: wrap; }
+    .ev-card .seg{ flex-wrap: wrap; width: 100%; justify-content: flex-start; }
+    .ev-card .seg button{ flex: 1 1 92px; }
+    .tell-row{ display:grid; grid-template-columns: 1fr auto; align-items:start; }
+    .tell-row .seg{ width:auto; flex-wrap: nowrap; justify-content:flex-end; }
+    .tell-row .seg button{ min-width: 96px; flex: 0 0 auto; }
+    @media (max-width: 650px){
+      .tell-row{ grid-template-columns: 1fr; }
+      .tell-row .seg{ width:100%; flex-wrap: wrap; justify-content:flex-start; }
+      .tell-row .seg button{ flex: 1 1 92px; }
+    }
+
+    .footerbar{
+      position: sticky; bottom: 0; z-index: 15; backdrop-filter: blur(10px);
+      background: linear-gradient(to top, rgba(7,10,18,.95), rgba(7,10,18,.72)); border-top:1px solid var(--border);
+    }
+    .footerbar-inner{
+      max-width: 1250px; margin: 0 auto; padding: 12px 18px; display:flex; gap: 12px;
+      align-items:center; justify-content: space-between; flex-wrap: wrap;
+    }
+    .footer-left{ display:flex; gap: 10px; align-items:center; flex-wrap:wrap; }
+    .footer-right{ display:flex; gap: 10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+
+    /* Rank interaction */
+    #confidencePill, #topBadge{ cursor:pointer; }
+    #confidencePill:hover, #topBadge:hover{ filter: brightness(1.05); }
+
+    .cand-rank{ display:flex; gap:10px; overflow-x:auto; padding:2px 2px 10px; margin-bottom:10px; border-bottom:1px solid var(--border); }
+    .cand-rank::-webkit-scrollbar{ height: 8px; }
+    .cand-rank::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.12); border-radius: 999px; }
+    .cand-rank-btn{ flex:0 0 auto; display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--border); border-radius:999px; background: rgba(255,255,255,.04); color: var(--text); cursor:pointer; user-select:none; white-space:nowrap; }
+    .cand-rank-btn:hover{ background: rgba(255,255,255,.07); }
+    .cand-rank-btn.active{ background: rgba(66,153,225,.14); border-color: rgba(66,153,225,.35); }
+    .cand-rank-pct{ font-variant-numeric: tabular-nums; color: var(--muted); border-left:1px solid rgba(255,255,255,.08); padding-left:8px; }
+
+    .rank-grid{ display:grid; grid-template-columns: 360px 1fr; gap:12px; align-items:stretch; }
+    @media (max-width: 900px){ .rank-grid{ grid-template-columns:1fr; } }
+    .rank-left, .rank-right{ border:1px solid var(--border); border-radius:14px; background: rgba(255,255,255,.03); overflow:hidden; }
+    .rank-left .head, .rank-right .head{ padding:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .rank-left .body, .rank-right .body{ max-height:70vh; overflow:auto; padding:12px; }
+    .rank-item{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid rgba(255,255,255,.10); border-radius:12px; background: rgba(255,255,255,.02); color: var(--text); cursor:pointer; text-align:left; }
+    .rank-item:hover{ background: rgba(255,255,255,.06); }
+    .rank-item.active{ background: rgba(66,153,225,.14); border-color: rgba(66,153,225,.35); }
+    .rank-item .left{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .rank-item .name{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rank-item .meta{ color: var(--muted); font-size:12px; }
+    .rank-item .pct{ font-variant-numeric: tabular-nums; opacity:.95; }
+
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <h1>Phasmo Decision Assistant</h1>
+        <p>Tabbed Evidence/Tells • Candidate Profile • Full Width Next Steps.</p>
+      </div>
+
+      <div class="actions">
+        <button id="ghostGuideBtn" class="btn primary">Ghost guide</button>
+        <button id="jumpTellsBtn" class="btn warn">Switch to Tells</button>
+        <button id="copyBtn" class="btn">Copy share link</button>
+        <button id="resetBtn" class="btn danger">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="grid-top">
+      
+      <div class="card">
+        <div class="card-header">
+            <div class="tab-nav">
+                <button class="tab-btn active" id="btn-tab-ev" onclick="switchTab('ev')">Evidence</button>
+                <button class="tab-btn" id="btn-tab-tells" onclick="switchTab('tells')">Tells / tests</button>
+            </div>
+          <span class="pill" id="dynamicStatusPill">—</span>
+        </div>
+        
+        <div class="card-body">
+            <div id="tab-content-ev" class="tab-content active">
+                <div class="evidence-grid" id="evidenceRows"></div>
+                <div class="section" style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                      <h4 style="margin:0; font-size:13px; color:rgba(255,255,255,.92);">Observed Hunt Speed</h4>
+                      <span class="tiny" style="font-weight:400; opacity:.7;">Filters candidates</span>
+                    </div>
+                    <div class="seg" style="width:100%; display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+                      <button data-kind="speed" data-val="normal" id="speedNormal">Normal</button>
+                      <button data-kind="speed" data-val="fast" id="speedFast">Fast</button>
+                      <button data-kind="speed" data-val="slow" id="speedSlow">Slow</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-content-tells" class="tab-content">
+                <input id="tellSearchInline" class="search" placeholder="Search tells (salt, speed, camera, incense…)" />
+                <div class="tells-scroll" id="tellAccordionsInline"></div>
+                <div class="tiny" style="margin-top:8px;">Tip: Press <b>Ctrl/Cmd + K</b> for full‑screen tells.</div>
+            </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Most likely ghost</h2>
+            <div class="sub">Auto-selects top candidate. Use Ghost guide to browse/switch.</div>
+          </div>
+          <span id="topBadge" class="pill">—</span>
+        </div>
+        <div class="card-body">
+          <div class="cand-rank" id="candRank" aria-label="Candidate ranking"></div>
+          <div class="profile" id="mostLikely">
+            <div class="tiny">Add evidence or tells to get candidates.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card full-width-card">
+        <div class="card-header">
+          <div>
+            <h2>Recommended next step</h2>
+            <div class="sub">Top action(s) to narrow candidates fast.</div>
+          </div>
+          <span id="statusPill" class="pill">—</span>
+        </div>
+        <div class="card-body">
+          <div class="steps" id="steps"></div>
+        </div>
+      </div>
+
+  </div>
+
+  <div id="ghostOverlay" class="overlay" role="dialog" aria-modal="true" aria-label="Ghost guide">
+    <div class="modal" role="document">
+      <div class="modal-head">
+        <div>
+          <h3>Ghost guide</h3>
+          <div class="tiny">Browse all ghosts or candidates. Click a ghost to view the profile.</div>
+        </div>
+        <button class="close" id="closeGhost">Close</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
+          <span class="pill">
+            View
+            <select id="guideView" class="select">
+              <option value="candidates">Candidates</option>
+              <option value="all">All ghosts</option>
+            </select>
+          </span>
+          <input id="ghostSearch" class="search" style="margin:0; flex:1 1 260px;" placeholder="Search ghosts (goryo, mimic, hantu…)" />
+          <span class="pill" id="candCountPill">—</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 360px 1fr; gap:12px; align-items:start;">
+          <div class="card" style="box-shadow:none;">
+            <div class="card-header">
+              <div>
+                <h2 style="margin:0; font-size:13px;">List</h2>
+                <div class="sub" id="guideCount">—</div>
+              </div>
+              <span class="pill">Click a ghost</span>
+            </div>
+            <div class="card-body" style="padding:12px;">
+              <div class="cand-list" id="guideList" style="max-height: 60vh;"></div>
+            </div>
+          </div>
+
+          <div class="card" style="box-shadow:none;">
+            <div class="card-header">
+              <div>
+                <h2 style="margin:0; font-size:13px;">Profile</h2>
+                <div class="sub">Includes “Next to confirm” for the selected ghost.</div>
+              </div>
+              <span id="midBadge" class="pill">—</span>
+            </div>
+            <div class="card-body">
+              <div class="profile" id="ghostInfo"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tellsOverlay" class="overlay" role="dialog" aria-modal="true" aria-label="Tells and tests">
+    <div class="modal" role="document">
+      <div class="modal-head">
+        <div>
+          <h3>Tells & tests (full width)</h3>
+          <div class="tiny">Hard‑lock tells are tagged. Marking them as <b>Seen</b> locks candidates.</div>
+        </div>
+        <button class="close" id="closeTells">Close</button>
+      </div>
+      <div class="modal-body">
+        <input id="tellSearch" class="search" placeholder="Search tells (salt, speed, camera, incense…)" />
+        <div id="tellAccordions"></div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div id="rankOverlay" class="overlay" role="dialog" aria-modal="true" aria-label="Candidate ranking">
+    <div class="modal" role="document">
+      <div class="modal-head">
+        <div>
+          <h3>Candidate ranking</h3>
+          <div class="tiny">Click a ghost on the left to view details on the right.</div>
+        </div>
+        <button class="close" id="closeRank">Close</button>
+      </div>
+      <div class="modal-body">
+        <div class="rank-grid">
+          <div class="rank-left">
+            <div class="head">
+              <div>
+                <div style="font-weight:700;">Most likely</div>
+                <div class="tiny" id="rankCount">—</div>
+              </div>
+              <span class="pill">Pick one</span>
+            </div>
+            <div class="body" id="rankList"></div>
+          </div>
+
+          <div class="rank-right">
+            <div class="head">
+              <div>
+                <div style="font-weight:700;">Profile</div>
+                <div class="tiny">Scrolls independently</div>
+              </div>
+              <span class="pill" id="rankBadge">—</span>
+            </div>
+            <div class="body">
+              <div class="profile" id="rankGhostInfo"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+<div class="footerbar">
+    <div class="footerbar-inner">
+      <div class="footer-left">
+        <span class="pill">
+          Evidence mode
+          <select id="mode" class="select">
+            <option value="3">3 evidence (normal)</option>
+            <option value="2">2 evidence (nightmare)</option>
+            <option value="1">1 evidence (insanity)</option>
+            <option value="0">0 evidence (no evidence)</option>
+          </select>
+        </span>
+
+        <span class="pill">
+          Beginner tips
+          <select id="tips" class="select">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </span>
+      </div>
+
+      <div class="footer-right">
+        <span class="pill" id="confidencePill">—</span>
+      </div>
+    </div>
+  </div>
+
+<script>
+
+/* ===================== Data ===================== */
+const EVIDENCE = [
+  { id:"emf5", label:"EMF Level 5", how:"EMF reader shows a solid level 5 during an interaction." },
+  { id:"dots", label:"D.O.T.S Projector", how:"You see a ghost silhouette run through DOTS (sometimes camera helps)." },
+  { id:"uv", label:"Ultraviolet", how:"UV shows fingerprints/handprints/footprints after touches/steps." },
+  { id:"freezing", label:"Freezing Temps", how:"Thermo reads below 0°C / 32°F (or visible cold breath in some cases)." },
+  { id:"orbs", label:"Ghost Orbs", how:"See orbs on a camera/video feed (night vision helps)." },
+  { id:"writing", label:"Ghost Writing", how:"Ghost writes in the book after it’s placed." },
+  { id:"spiritbox", label:"Spirit Box", how:"Spirit Box replies when lights are off and you ask questions." },
+];
+
+/* GHOST DATA with SPEEDS */
+const GHOSTS = [
+  { name:"Banshee", evidence:["dots","orbs","uv"], speeds:["normal"],
+    strengths:["Targets one chosen player (if inside).", "More likely to do a singing ghost event."],
+    weaknesses:["Distinct wails on Parabolic/Sound Recorder."] },
+
+  { name:"Demon", evidence:["writing","uv","freezing"], speeds:["normal"],
+    strengths:["Incense is less effective (shorter safety).", "Can rarely hunt at any sanity level."],
+    weaknesses:["Crucifix range is larger than the indicator."] },
+
+  { name:"Deogen", evidence:["dots","writing","spiritbox"], speeds:["fast","slow"],
+    strengths:["Always knows where you are in a hunt; rushes toward you fast."],
+    weaknesses:["Extremely slow once it gets close to its target."] },
+
+  { name:"Goryo", evidence:["dots","emf5","uv"], speeds:["normal"],
+    strengths:["DOTS only happens when no player is in the same room.", "DOTS silhouette can only be seen on camera."],
+    weaknesses:["Can’t roam far / can’t change favorite room."] },
+
+  { name:"Hantu", evidence:["orbs","uv","freezing"], speeds:["fast","slow"],
+    strengths:["Faster in colder areas during hunts.", "Can show freezing breath in hunts if breaker is off."],
+    weaknesses:["Warmer areas slow it down.", "Will never turn the fuse box on."] },
+
+  { name:"Jinn", evidence:["emf5","uv","freezing"], speeds:["normal","fast"],
+    strengths:["Faster if a distant player is in LoS while breaker is on.", "Can drain a chunk of sanity nearby."],
+    weaknesses:["Can’t use ability if breaker is off.", "Will never turn the fuse box off directly."] },
+
+  { name:"Mare", evidence:["writing","orbs","spiritbox"], speeds:["normal"],
+    strengths:["Higher hunt sanity in the dark.", "Sometimes turns lights off right after you turn them on."],
+    weaknesses:["Lower hunt sanity in the light.", "Will never turn a light on."] },
+
+  { name:"Myling", evidence:["writing","emf5","uv"], speeds:["normal"],
+    strengths:["Quieter during hunts (audible at closer range)."],
+    weaknesses:["More frequent paranormal sounds on Parabolic/Sound Recorder."] },
+
+  { name:"Obake", evidence:["emf5","orbs","uv"], speeds:["normal"],
+    strengths:["May fail to leave UV sometimes.", "UV can disappear sooner than normal."],
+    weaknesses:["Small chance of special fingerprints.", "Can briefly shapeshift during hunts."] },
+
+  { name:"Oni", evidence:["dots","emf5","freezing"], speeds:["normal"],
+    strengths:["More active when players are nearby.", "More visible during hunts."],
+    weaknesses:["Cannot do the airball ghost event."] },
+
+  { name:"Onryo", evidence:["orbs","freezing","spiritbox"], speeds:["normal"],
+    strengths:["After extinguishing 3 flames, will try to hunt regardless of sanity."],
+    weaknesses:["A nearby lit flame blocks hunts (like a crucifix)."] },
+
+  { name:"Phantom", evidence:["dots","uv","spiritbox"], speeds:["normal"],
+    strengths:["Looking at it (with heartbeat) drains sanity.", "May walk to a random player."],
+    weaknesses:["Photo makes it disappear.", "Less visible during hunts."] },
+
+  { name:"Poltergeist", evidence:["writing","uv","spiritbox"], speeds:["normal"],
+    strengths:["Can throw multiple objects at once.", "Throws can be high-velocity."],
+    weaknesses:["Weak when there’s nothing to throw nearby."] },
+
+  { name:"Raiju", evidence:["dots","emf5","orbs"], speeds:["normal","fast"],
+    strengths:["Faster near active electronics."],
+    weaknesses:["Electronics malfunction from further away during hunts."] },
+
+  { name:"Revenant", evidence:["writing","orbs","freezing"], speeds:["fast","slow"],
+    strengths:["Very fast when it detects a player in a hunt."],
+    weaknesses:["Very slow when it doesn’t detect a player."] },
+
+  { name:"Shade", evidence:["writing","emf5","freezing"], speeds:["normal"],
+    strengths:["Less likely to interact."],
+    weaknesses:["Cannot hunt if people are nearby."] },
+
+  { name:"Spirit", evidence:["writing","emf5","spiritbox"], speeds:["normal"],
+    strengths:["No special strength."],
+    weaknesses:["Incense is more effective (prevents hunts for longer)."] },
+
+  { name:"The Mimic", evidence:["uv","freezing","spiritbox"], speeds:["normal","fast","slow"],
+    strengths:["Can mimic other ghosts’ abilities/traits."],
+    weaknesses:["Shows fake Ghost Orbs as extra evidence (even with 0 evidence)."],
+    extraOrbs:true },
+
+  { name:"The Twins", evidence:["emf5","freezing","spiritbox"], speeds:["fast","slow"],
+    strengths:["Either twin can start a hunt (not at same time).", "Often interacts in two places close together."],
+    weaknesses:["One twin is slower, the other faster (speed can feel inconsistent)."] },
+
+  { name:"Wraith", evidence:["dots","emf5","spiritbox"], speeds:["normal"],
+    strengths:["Cannot be tracked by footsteps.", "May teleport to a random player."],
+    weaknesses:["Will not step in salt."] },
+
+  { name:"Yokai", evidence:["dots","orbs","spiritbox"], speeds:["normal"],
+    strengths:["Talking near it can let it hunt at much higher sanity."],
+    weaknesses:["Can only hear players in a shorter radius during hunts."] },
+
+  { name:"Yurei", evidence:["dots","orbs","freezing"], speeds:["normal"],
+    strengths:["Can drain sanity quickly nearby.", "Ability often slams doors."],
+    weaknesses:["Smudging temporarily traps it and reduces wandering."] },
+
+  { name:"Moroi", evidence:["writing","freezing","spiritbox"], speeds:["normal","fast","slow"],
+    strengths:["Gets faster as average team sanity drops.", "Can apply a 'curse' from Spirit Box/Parabolic that drains sanity faster."],
+    weaknesses:["Incense blinds it for longer than normal during hunts."] },
+
+  { name:"Thaye", evidence:["dots","writing","orbs"], speeds:["fast","slow"],
+    strengths:["Starts very active and can hunt early; begins fast during hunts."],
+    weaknesses:["Ages over time around players: becomes slower and less active, and hunts later."] },
+
+  { name:"Dayan", evidence:["emf5","orbs","spiritbox"], speeds:["fast","slow"],
+    strengths:["When players move within ~10m, it becomes much faster and more dangerous."],
+    weaknesses:["When nearby players stand still, it becomes much slower and easier to survive."] },
+
+  { name:"Obambo", evidence:["writing","uv","dots"], speeds:["fast","slow"],
+    strengths:["In its aggressive state it hunts earlier and is faster; can even switch states mid-hunt."],
+    weaknesses:["In its calm state it hunts very late and is slower; aggressive-start hunts are shorter."] },
+
+  { name:"Gallu", evidence:["emf5","uv","spiritbox"], speeds:["normal"],
+    strengths:["Protective equipment (crucifix/incense) can provoke it into a stronger 'enraged' state that weakens equipment."],
+    weaknesses:["After being enraged it can become weakened, making protective equipment more effective."] },
+
+];
+
+const TELLS = [
+  { id:"salt_no_step", title:"Salt pile stays untouched even though the ghost passes through that exact spot", cat:"Movement tests", ghosts:["Wraith"], hardLock:true, lockGhosts:["Wraith","The Mimic"],
+    meaning:"If the ghost definitely crossed the salted spot and the pile never gets disturbed, that strongly suggests a Wraith (or a Mimic copying Wraith behavior).",
+    how:"Place salt directly in a narrow doorway/hall. Use motion sensor / activity / line-of-sight to be confident the ghost crossed that exact tile. If the pile stays perfectly intact after multiple passes, mark this." },
+  { id:"gallu_salt_after_enrage", title:"After it gets enraged, it stops disturbing NEW salt piles until after a hunt (Hard‑lock)", cat:"Movement tests", ghosts:["Gallu"], hardLock:true, lockGhosts:["Gallu","The Mimic"],
+    meaning:"Gallu has states. In its enraged state, it can ignore salt completely (Mimic can copy). A practical test: once it has clearly stepped in salt / burned a crucifix / been smudged, it may stop disturbing additional salt piles until after a hunt.",
+    how:"Lay 2–3 separate salt piles along a path the ghost uses. If it disturbs one pile, then you notice it repeatedly crosses later piles without disturbing them until it hunts, that’s a strong Gallu signal. (Warning: a Wraith ignores ALL salt all the time.)" },
+
+  { id:"banshee_scream", title:"You hear the unique Banshee scream on the Parabolic Microphone", cat:"Audio tests", ghosts:["Banshee"], hardLock:true, lockGhosts:["Banshee","The Mimic"],
+    meaning:"Banshees have a rare chance (~33% on paramic sounds) to produce a unique wail instead of whispering.",
+    how:"Hold a Parabolic Microphone and point it toward the ghost. If you hear a high-pitched scream/wail, lock it." },
+
+  { id:"mimic_orbs", title:"Ghost Orbs show up even with 0-evidence mode", cat:"Special evidence rules", ghosts:["The Mimic"], hardLock:true, lockGhosts:["The Mimic"],
+    meaning:"The Mimic always shows Orbs as a bonus clue, even when evidence is set to 0.",
+    how:"Check video camera feed. If Orbs exist in 0-evidence, lock to Mimic." },
+
+  { id:"goryo_dots_camera_only", title:"DOTS only appears on camera (and not when you’re in the room)", cat:"Special evidence rules", ghosts:["Goryo"], hardLock:true, lockGhosts:["Goryo","The Mimic"],
+    meaning:"That’s the signature Goryo DOTS behavior (or Mimic copying it).",
+    how:"Place DOTS + camera, then leave the room and watch from outside/van." },
+
+  { id:"obake_special_uv", title:"You see the Obake special fingerprint", cat:"Special evidence rules", ghosts:["Obake"], hardLock:true, lockGhosts:["Obake","The Mimic"],
+    meaning:"A special fingerprint pattern is Obake-only (or Mimic copying it).",
+    how:"UV-check doors/windows. If you get the special print, lock the list." },
+
+  { id:"deogen_close_slow", title:"It rushes fast at first, then becomes SUPER slow near you", cat:"Speed tests", ghosts:["Deogen"], hardLock:true, lockGhosts:["Deogen","The Mimic"],
+    meaning:"Deogen always knows where you are, but turns into a snail once close (or Mimic copying it).",
+    how:"In a safe loop spot, let it approach. If it becomes comically slow near you, lock it." },
+
+  { id:"revenant_speed_flip", title:"Turbo when it sees you, snail when it doesn’t", cat:"Speed tests", ghosts:["Revenant"], hardLock:true, lockGhosts:["Revenant","The Mimic"],
+    meaning:"Revenant speed flips hard based on detection (or Mimic copying it).",
+    how:"Break line-of-sight repeatedly. If speed hard-switches, lock it." },
+
+  { id:"hantu_temp_speed", title:"Speed changes strongly with temperature", cat:"Speed tests", ghosts:["Hantu"], hardLock:true, lockGhosts:["Hantu","The Mimic"],
+    meaning:"Hantu is much faster in cold areas and slows in warmth (or Mimic copying it).",
+    how:"Compare speed in a cold room vs a warm hall." },
+
+  { id:"jinn_breaker_los", title:"Speeds up in LoS only when breaker is ON", cat:"Speed tests", ghosts:["Jinn"], hardLock:true, lockGhosts:["Jinn","The Mimic"],
+    meaning:"Jinn burst-speed needs breaker on (or Mimic copying it).",
+    how:"Confirm breaker ON. Let it see you from far. If it ‘zooms’ only with breaker on, lock it." },
+
+  { id:"raiju_electronics", title:"Gets faster around active electronics", cat:"Speed tests", ghosts:["Raiju"], hardLock:true, lockGhosts:["Raiju","The Mimic"],
+    meaning:"Raiju speed boost near electronics (or Mimic copying it).",
+    how:"Try a hunt with electronics on in the path vs all off. Speed spike near devices = lock it." },
+
+  { id:"phantom_photo_vanish", title:"Photo makes it disappear during an event", cat:"Visibility / photos", ghosts:["Phantom"], hardLock:true, lockGhosts:["Phantom","The Mimic"],
+    meaning:"Phantom vanishes to a photo during a manifestation/event (or Mimic copying it).",
+    how:"Take a photo during an event. If it instantly disappears, lock it." },
+
+  { id:"spirit_smudge_long", title:"Incense blocks hunts for noticeably longer than normal", cat:"Sanity / hunt rules", ghosts:["Spirit"], hardLock:true, lockGhosts:["Spirit","The Mimic"],
+    meaning:"Spirit has a longer incense safety window (or Mimic copying it).",
+    how:"After smudging, if it stays calm longer than usual, lock it." },
+
+  { id:"demon_smudge_short", title:"Incense feels weak (hunts again quickly) + early hunting vibe", cat:"Sanity / hunt rules", ghosts:["Demon"], hardLock:true, lockGhosts:["Demon","The Mimic"],
+    meaning:"Demon has shorter incense safety + can hunt earlier (or Mimic copying it).",
+    how:"If it repeatedly hunts soon after smudge and other signs fit, lock it." },
+
+  { id:"moroi_smudge_long", title:"Incense blinds it longer than normal (~7.5s vs ~5s)", cat:"Sanity / hunt rules", ghosts:["Moroi"], hardLock:true, lockGhosts:["Moroi","The Mimic"],
+    meaning:"Moroi stays 'blind' to you for longer after incense during a hunt (Mimic can copy this behavior).",
+    how:"During a hunt, smudge it and time how long it takes before it can see/kill again. If it’s clearly longer than normal, lock it." },
+
+  { id:"thaye_aging", title:"It starts fast/active, then clearly slows down over time (aging)", cat:"Speed tests", ghosts:["Thaye"], hardLock:true, lockGhosts:["Thaye","The Mimic"],
+    meaning:"Thaye gets weaker as it ages around players: slower hunts + fewer interactions (Mimic can copy).",
+    how:"Hang around the ghost room for several minutes. If hunts/interactions drop and hunt speed noticeably decreases compared to earlier, lock it." },
+
+  { id:"dayan_move_vs_still", title:"Near the ghost: moving makes it fast, standing still makes it slow", cat:"Speed tests", ghosts:["Dayan"], hardLock:true, lockGhosts:["Dayan","The Mimic"],
+    meaning:"Dayan’s speed (within about 10m) reacts to player movement—fast when you move, slow when you stand still (Mimic can copy).",
+    how:"From a safe loop/hide spot, compare its speed while you keep moving vs when you stop completely. Big difference = lock it." },
+
+  { id:"obambo_state_cycle", title:"Activity/speed cycles between calm and aggressive on a timer", cat:"Sanity / hunt rules", ghosts:["Obambo"], hardLock:true, lockGhosts:["Obambo","The Mimic"],
+    meaning:"Obambo flips between calm and aggressive states on a cycle, changing activity + hunt threshold + hunt speed (Mimic can copy).",
+    how:"After the front door is opened, watch for repeating ~2 minute shifts in activity and/or hunt speed. If it switches speed mid-hunt, that’s a huge Obambo tell." },
+
+  { id:"gallu_protection_enrage", title:"Protective gear provokes it (crucifix/incense/salt) → it changes states", cat:"Sanity / hunt rules", ghosts:["Gallu"], hardLock:true, lockGhosts:["Gallu","The Mimic"],
+    meaning:"Gallu reacts to protective equipment and can enter an enraged/weakened cycle (Mimic can copy).",
+    how:"If you notice behavior changing right after crucifix burns or after incense blindness ends (and especially salt behavior changing), consider this a strong lock." },
+
+  { id:"onryo_candle_three", title:"After 3 flame blowouts, it tries to hunt", cat:"Sanity / hunt rules", ghosts:["Onryo"], hardLock:true, lockGhosts:["Onryo","The Mimic"],
+    meaning:"Onryo has the 3-flame pattern (or Mimic copying it).",
+    how:"Use candles/lighters, count blowouts. Hunt attempt on the 3rd = lock it." },
+
+  { id:"yurei_door", title:"It touches a door and it fully slams shut (or opens) instantly", cat:"Interaction tests", ghosts:["Yurei"],
+    meaning:"Yurei ability interacts with doors twice in one frame, often causing a full slam or full open. (Note: Only Yurei can do this without an event).",
+    how:"Watch doors. If one snaps fully shut instantly with a single sound (and no ghost event manifest), Yurei rises." },
+
+  { id:"wraith_teleport", title:"Random EMF 2/5 reading near a player, far from the ghost room", cat:"Interaction tests", ghosts:["Wraith"],
+    meaning:"Wraith can teleport to a random player, giving EMF at that spot.",
+    how:"If you get a random EMF reading right next to you while far away from the ghost room (and no event), Wraith rises." },
+
+  { id:"quiet_hunt", title:"Hunt sounds are unusually quiet until very close", cat:"Audio tests", ghosts:["Myling"],
+    meaning:"Mylings are harder to hear during hunts (good hint, not always perfectly obvious).",
+    how:"Hide with a flashlight on the floor. If you hear it before the flashlight flickers, it’s probably NOT a Myling." },
+
+  { id:"mare_light_bully", title:"Keeps turning lights off quickly (darkness bully vibe)", cat:"Sanity / hunt rules", ghosts:["Mare"],
+    meaning:"Mare is more dangerous in the dark and often bullies lights (strong hint, not absolute).",
+    how:"If lights pop off right after you turn them on (and it never turns them on), Mare rises." },
+
+  { id:"polty_multi_throw", title:"Throws multiple items rapidly (big object chaos)", cat:"Interaction tests", ghosts:["Poltergeist"],
+    meaning:"Poltergeist can chain-throw and make a messy room fast (strong hint, not absolute).",
+    how:"Pile throwables. If you hear many throws in quick succession, Poltergeist rises." },
+
+  { id:"twins_two_places", title:"Interactions in two places close together; speed feels inconsistent", cat:"Interaction tests", ghosts:["The Twins"],
+    meaning:"Twins often gives ‘two sources’ vibes and speed can feel inconsistent (hint).",
+    how:"If you frequently get two interaction spots close together, Twins rises." },
+
+  { id:"oni_visible", title:"More visible during hunts (less invisible time)", cat:"Visibility / photos", ghosts:["Oni"],
+    meaning:"Oni tends to be visible more often during hunts (hint).",
+    how:"From a safe angle, compare visibility time. More visible than usual nudges Oni up." },
+
+  { id:"shade_people_nearby", title:"Calms down hard when multiple people are in the room", cat:"Sanity / hunt rules", ghosts:["Shade"],
+    meaning:"Shade is shy and won’t hunt with people nearby (hint; can still be tricky).",
+    how:"Group up in the ghost room. If it refuses to hunt with people nearby, Shade rises." },
+
+  { id:"yokai_talk", title:"Talking near it ramps hunts sooner", cat:"Sanity / hunt rules", ghosts:["Yokai"],
+    meaning:"Yokai reacts to talking (hint; not a perfect lock).",
+    how:"Try ‘silent’ vs ‘talking’ in its room. If talking ramps hunts, Yokai rises." },
+];
+
+/* ===================== Storage (safe for file://) ===================== */
+const STORAGE_KEY = "phasmoDecisionState_single_v19";
+const memoryFallback = new Map();
+function safeGetItem(key){ try{ return localStorage.getItem(key); }catch{ return memoryFallback.get(key) ?? null; } }
+function safeSetItem(key,val){ try{ localStorage.setItem(key,val); }catch{ memoryFallback.set(key,val); } }
+
+const DEFAULT_STATE = () => ({
+  mode: "3",
+  tips: "off",
+  evidence: Object.fromEntries(EVIDENCE.map(e => [e.id, "unknown"])), // found|unknown|ruled
+  tells: Object.fromEntries(TELLS.map(t => [t.id, "unknown"])),       // seen|unknown|ruled
+  ui: { tellSearch:"", selectedGhost:null },
+  speed: "unknown" // "unknown" | "normal" | "fast" | "slow"
+});
+
+let state = loadState();
+applyStateFromQuery();
+
+/* ===================== Core logic ===================== */
+function saveState(){ safeSetItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function loadState(){
+  try{
+    const raw = safeGetItem(STORAGE_KEY);
+    if(!raw) return DEFAULT_STATE();
+    const parsed = JSON.parse(raw);
+    const fresh = DEFAULT_STATE();
+    return {
+      ...fresh,
+      ...parsed,
+      evidence: { ...fresh.evidence, ...(parsed.evidence||{}) },
+      tells: { ...fresh.tells, ...(parsed.tells||{}) },
+      ui: { ...fresh.ui, ...(parsed.ui||{}) },
+      speed: parsed.speed || "unknown"
+    };
+  }catch{ return DEFAULT_STATE(); }
+}
+
+function applyStateFromQuery(){
+  const params = new URLSearchParams(location.search);
+  const packed = params.get("s");
+  if(!packed) return;
+  try{
+    const json = JSON.parse(atob(packed));
+    const fresh = DEFAULT_STATE();
+    state.mode = String(json.mode ?? fresh.mode);
+    state.tips = String(json.tips ?? fresh.tips);
+    state.speed = String(json.speed ?? fresh.speed);
+    state.evidence = { ...fresh.evidence, ...(json.evidence||{}) };
+    state.tells = { ...fresh.tells, ...(json.tells||{}) };
+    state.ui = { ...fresh.ui, ...(json.ui||{}) };
+    saveState();
+  }catch{}
+}
+
+function setEvidence(id, value){ state.evidence[id] = value; saveState(); render(); }
+function setTell(id, value){ state.tells[id] = value; saveState(); render(); }
+function setSpeed(val){ 
+    state.speed = (state.speed === val) ? "unknown" : val; 
+    saveState(); 
+    render(); 
+}
+
+function vibeFromCount(n){
+  if(n <= 1) return "Locked";
+  if(n <= 3) return "Strong";
+  if(n <= 6) return "Okay";
+  if(n <= 12) return "Fuzzy";
+  return "Wide";
+}
+
+function scoreToPercents(cands){
+  // Stable % distribution using softmax on scores.
+  if(!cands.length) return [];
+  const temp = 6;
+  const weights = cands.map(c => Math.exp((c.score || 0) / temp));
+  const sum = weights.reduce((a,b)=>a+b, 0) || 1;
+  return weights.map(w => (w / sum) * 100);
+}
+function scoreToVibe(best, second){
+  if(best === null) return "—";
+  if(second === null) return "Strong";
+  const gap = best - second;
+  if(gap >= 35) return "Strong";
+  if(gap >= 18) return "Decent";
+  if(gap >= 8) return "Weak";
+  return "Fuzzy";
+}
+function intersectSets(a,b){
+  const out = new Set();
+  for(const x of a){ if(b.has(x)) out.add(x); }
+  return out;
+}
+function getHardLockSet(){
+  const active = TELLS.filter(t => t.hardLock && state.tells[t.id] === "seen");
+  if(!active.length) return null;
+  let set = new Set(active[0].lockGhosts);
+  for(const t of active.slice(1)){
+    set = intersectSets(set, new Set(t.lockGhosts));
+  }
+  return set;
+}
+
+function getCandidates(){
+  const mode = Number(state.mode);
+  const found = Object.entries(state.evidence).filter(([_,v])=>v==="found").map(([k])=>k);
+  const ruled = Object.entries(state.evidence).filter(([_,v])=>v==="ruled").map(([k])=>k);
+  const ignoreEvidence = (mode === 0);
+
+  const hardLock = getHardLockSet();
+
+  const cands = [];
+  for(const g of GHOSTS){
+    if(hardLock && !hardLock.has(g.name)) continue;
+
+    // Hard Rule-Out for Tells
+    const tellRuledOut = TELLS.some(t => 
+      t.hardLock && 
+      state.tells[t.id] === "ruled" && 
+      t.ghosts.includes(g.name)
+    );
+    if(tellRuledOut) continue;
+
+    // Speed Filter
+    if(state.speed !== "unknown"){
+        // If speed is set, the ghost MUST have that capability in its 'speeds' list.
+        if(!g.speeds.includes(state.speed)) continue;
+    }
+
+    // enforce "found" always
+    if(found.length){
+      const okFound = found.every(ev => g.evidence.includes(ev) || (g.extraOrbs && ev==="orbs"));
+      if(!okFound) continue;
+    }
+
+    // hard rule-outs only in 3 evidence mode
+    if(!ignoreEvidence && mode === 3 && ruled.length){
+      const hardFail = ruled.some(ev => g.evidence.includes(ev) || (g.extraOrbs && ev==="orbs"));
+      if(hardFail) continue;
+    }
+
+    let score = 100;
+
+    // soft penalties for ruled out in 2/1
+    if(!ignoreEvidence){
+      for(const ev of ruled){
+        if(g.name === "The Mimic" && ev === "orbs"){ score -= 60; continue; }
+        if(g.evidence.includes(ev)){
+          if(mode === 2) score -= 18;
+          if(mode === 1) score -= 28;
+        }
+      }
+    }
+
+    // Tell scoring (non-hard tells only)
+    for(const t of TELLS){
+      const v = state.tells[t.id];
+      if(t.hardLock) continue;
+      const hasTell = t.ghosts.includes(g.name);
+      if(v === "seen" && hasTell) score += 18;
+      if(v === "seen" && !hasTell) score -= 6;
+      if(v === "ruled" && hasTell) score -= 14;
+    }
+
+    score += found.length * 6;
+    cands.push({ ghost:g, score: Math.max(0, Math.round(score)) });
+  }
+
+  cands.sort((a,b)=> b.score - a.score || a.ghost.name.localeCompare(b.ghost.name));
+  return cands;
+}
+
+function computeBestEvidenceChecks(cands){
+  const mode = Number(state.mode);
+  if(mode === 0) return [];
+
+  const unknown = Object.entries(state.evidence).filter(([_,v])=>v==="unknown").map(([k])=>k);
+  const options = [];
+
+  for(const ev of unknown){
+    const yes = cands.filter(c => c.ghost.evidence.includes(ev) || (c.ghost.extraOrbs && ev==="orbs")).length;
+    const no = cands.length - yes;
+    if(cands.length <= 1) continue;
+
+    const p = yes / cands.length;
+    const splitScore = 1 - Math.abs(0.5 - p) * 2;
+    const reliability = (mode === 3 ? 1 : mode === 2 ? 0.75 : 0.6);
+    const score = splitScore * 100 * reliability;
+
+    options.push({ id:ev, score, yes, no });
+  }
+  options.sort((a,b)=> b.score - a.score);
+  return options.slice(0, 3);
+}
+
+function computeBestTellChecks(cands){
+  const unknown = TELLS.filter(t => !t.hardLock).filter(t => state.tells[t.id] === "unknown");
+  const options = [];
+
+  for(const t of unknown){
+    const yes = cands.filter(c => t.ghosts.includes(c.ghost.name)).length;
+    const no = cands.length - yes;
+    if(cands.length <= 1) continue;
+
+    const p = yes / cands.length;
+    const splitScore = 1 - Math.abs(0.5 - p) * 2;
+    const specificity = 1 - Math.min(1, (t.ghosts.length - 1) / 10);
+    const score = (splitScore * 70) + (specificity * 30);
+
+    options.push({ id: t.id, score, yes, no });
+  }
+
+  // favor speed-ish categories
+  const isSpeedish = (id)=> {
+    const tt = TELLS.find(x=>x.id===id);
+    return tt && /Speed/i.test(tt.cat);
+  };
+
+  options.sort((a,b)=>{
+    const as = isSpeedish(a.id) ? 1 : 0;
+    const bs = isSpeedish(b.id) ? 1 : 0;
+    if(as !== bs) return bs - as;
+    return b.score - a.score;
+  });
+
+  return options.slice(0, 4);
+}
+
+function computePrioritySignatureChecks(cands){
+  // Prioritize tells/tests that are:
+  // 1) relevant to the top candidates
+  // 2) split the current candidate set well
+  // 3) hard-lock capable (big payoff)
+  const TOP_N = 3;
+  const topNames = new Set(cands.slice(0, TOP_N).map(c => c.ghost.name));
+  const options = [];
+
+  for(const t of TELLS){
+    if(state.tells[t.id] !== "unknown") continue;
+
+    const set = new Set((t.hardLock ? (t.lockGhosts || []) : (t.ghosts || [])));
+    const yes = cands.filter(c => set.has(c.ghost.name)).length;
+    const no = cands.length - yes;
+
+    // must split the set (otherwise it's not helpful right now)
+    if(cands.length <= 1) continue;
+    if(yes === 0 || no === 0) continue;
+
+    const p = yes / cands.length;
+    const splitScore = 1 - Math.abs(0.5 - p) * 2; // 0..1
+
+    let topCoverage = 0;
+    for(const name of topNames){ if(set.has(name)) topCoverage++; }
+    const topCoverageScore = topCoverage / Math.max(1, Math.min(TOP_N, cands.length)); // 0..1
+
+    // specificity: fewer ghosts in the rule = more specific
+    const size = Math.max(1, set.size);
+    const specificity = 1 - Math.min(1, (size - 1) / 10); // 0..1-ish
+
+    // Scoring: hard-lock + top relevance + good split
+    let score = 0;
+    score += splitScore * 60;
+    score += topCoverageScore * 30;
+    score += specificity * 10;
+    if(t.hardLock) score += 18;
+
+    options.push({ id: t.id, score, yes, no, topCoverage, hardLock: !!t.hardLock });
+  }
+
+  options.sort((a,b)=>{
+    if(a.hardLock !== b.hardLock) return (b.hardLock ? 1 : 0) - (a.hardLock ? 1 : 0);
+    if(b.topCoverage !== a.topCoverage) return b.topCoverage - a.topCoverage;
+    return b.score - a.score;
+  });
+
+  return options.slice(0, 4);
+}
+
+function computeGhostNextChecks(ghostName, cands){
+  // "What should I do next to confirm THIS ghost?" — pick the best unknown tests that include this ghost.
+  const options = [];
+  for(const t of TELLS){
+    if(state.tells[t.id] !== "unknown") continue;
+
+    const set = new Set((t.hardLock ? (t.lockGhosts || []) : (t.ghosts || [])));
+    if(!set.has(ghostName)) continue;
+
+    const yes = cands.filter(c => set.has(c.ghost.name)).length;
+    const no = cands.length - yes;
+    if(cands.length <= 1) continue;
+    if(yes === 0 || no === 0) continue;
+
+    const p = yes / cands.length;
+    const splitScore = 1 - Math.abs(0.5 - p) * 2;
+
+    const size = Math.max(1, set.size);
+    const specificity = 1 - Math.min(1, (size - 1) / 10);
+
+    let score = splitScore * 70 + specificity * 20 + (t.hardLock ? 18 : 0);
+    options.push({ id: t.id, score, yes, no, hardLock: !!t.hardLock });
+  }
+
+  options.sort((a,b)=>{
+    if(a.hardLock !== b.hardLock) return (b.hardLock ? 1 : 0) - (a.hardLock ? 1 : 0);
+    return b.score - a.score;
+  });
+
+  return options.slice(0, 3);
+}
+
+function labelForEvidence(id){
+  const e = EVIDENCE.find(x=>x.id===id);
+  return e ? e.label : id;
+}
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+function tellCategoryName(cat){
+  if(/Speed/i.test(cat)) return "Speed tests (fast/slow/variable)";
+  if(/Movement/i.test(cat)) return "Movement tests";
+  if(/Audio/i.test(cat)) return "Audio tests";
+  if(/Visibility/i.test(cat)) return "Visibility / photo tests";
+  if(/Interaction/i.test(cat)) return "Interaction tests";
+  if(/Special evidence/i.test(cat)) return "Special evidence rules";
+  if(/Sanity/i.test(cat)) return "Sanity / hunt rules";
+  return cat;
+}
+
+
+/* ===================== UI helpers (v10) ===================== */
+const $ = (sel)=> document.querySelector(sel);
+
+const evidenceRows = $("#evidenceRows");
+const mostLikelyEl = $("#mostLikely");
+const candRankEl = $("#candRank");
+const stepsEl = $("#steps");
+
+const leftStatusEl = $("#leftStatus"); // This may not exist in new layout, logic updated below in renderEvidence
+const dynamicStatusPill = $("#dynamicStatusPill");
+const topBadgeEl = $("#topBadge");
+const tellsStatusEl = $("#tellsStatus"); // This also might not exist directly, logic handles it
+const statusPillEl = $("#statusPill");
+const confidencePill = $("#confidencePill");
+
+const modeEl = $("#mode");
+const tipsEl = $("#tips");
+const copyBtn = $("#copyBtn");
+const resetBtn = $("#resetBtn");
+
+const jumpTellsBtn = $("#jumpTellsBtn");
+
+const ghostOverlay = $("#ghostOverlay");
+const ghostGuideBtn = $("#ghostGuideBtn");
+const closeGhost = $("#closeGhost");
+const guideView = $("#guideView");
+const ghostSearch = $("#ghostSearch");
+const candCountPill = $("#candCountPill");
+const guideCount = $("#guideCount");
+const guideList = $("#guideList");
+const ghostInfo = $("#ghostInfo");
+const midBadge = $("#midBadge");
+
+const tellsOverlay = $("#tellsOverlay");
+
+// Ranking overlay
+const rankOverlay = $("#rankOverlay");
+const closeRank = $("#closeRank");
+const rankList = $("#rankList");
+const rankGhostInfo = $("#rankGhostInfo");
+const rankBadge = $("#rankBadge");
+const rankCount = $("#rankCount");
+const closeTells = $("#closeTells");
+const tellSearchEl = $("#tellSearch");
+const tellAccordions = $("#tellAccordions");
+
+const tellSearchInline = $("#tellSearchInline");
+const tellAccordionsInline = $("#tellAccordionsInline");
+
+/* Init controls */
+modeEl.value = state.mode;
+tipsEl.value = state.tips;
+tellSearchEl.value = state.ui.tellSearch || "";
+tellSearchInline.value = state.ui.tellSearch || "";
+
+/* Overlay open/close */
+function openGhostGuide(){
+  ghostOverlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+  renderGhostGuide(getCandidates());
+  setTimeout(()=> ghostSearch.focus(), 10);
+}
+function closeGhostGuide(){
+  ghostOverlay.classList.remove("open");
+  document.body.style.overflow = "";
+}
+function openTells(){
+  tellsOverlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+  renderTellsOverlay();
+  setTimeout(()=> tellSearchEl.focus(), 10);
+}
+function closeTellsOverlay(){
+  tellsOverlay.classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+function openRankOverlay(){
+  if(!rankOverlay) return;
+  rankOverlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+  renderRankOverlay(getCandidates());
+}
+function closeRankOverlay(){
+  if(!rankOverlay) return;
+  rankOverlay.classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+function renderRankOverlay(cands){
+  if(!rankList || !rankGhostInfo) return;
+  rankList.innerHTML = "";
+
+  if(!cands.length){
+    if(rankCount) rankCount.textContent = "No candidates yet";
+    if(rankBadge) rankBadge.textContent = "—";
+    rankGhostInfo.innerHTML = `<div class="tiny">Add evidence or tells to get candidates.</div>`;
+    return;
+  }
+
+  const percents = scoreToPercents(cands).map(p=>Math.round(p));
+  const valid = new Set(cands.map(c=>c.ghost.name));
+
+  const chosen = (state.ui.rankSelectedGhost && valid.has(state.ui.rankSelectedGhost))
+    ? state.ui.rankSelectedGhost
+    : (state.ui.selectedGhost && valid.has(state.ui.selectedGhost))
+      ? state.ui.selectedGhost
+      : cands[0].ghost.name;
+
+  state.ui.rankSelectedGhost = chosen;
+
+  if(rankCount) rankCount.textContent = `${cands.length} candidate${cands.length===1?"":"s"} in order`;
+
+  for(let i=0;i<cands.length;i++){
+    const name = cands[i].ghost.name;
+    const score = cands[i].score;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "rank-item" + (name===chosen ? " active" : "");
+    btn.setAttribute("data-kind","rank-pick");
+    btn.setAttribute("data-ghost", name);
+    btn.innerHTML = `
+      <div class="left">
+        <div class="name">${escapeHtml(name)}</div>
+        <div class="meta">Score ${score}</div>
+      </div>
+      <div class="pct">${percents[i]}%</div>
+    `;
+    rankList.appendChild(btn);
+  }
+
+  state.ui.selectedGhost = chosen;
+  renderGhostProfile(chosen, cands, rankGhostInfo, null);
+  if(rankBadge) rankBadge.textContent = chosen;
+}
+
+function evidenceById(id){
+  return EVIDENCE.find(e=>e.id===id);
+}
+
+// Tab Switching Function
+let currentTab = 'ev'; // 'ev' or 'tells'
+function switchTab(tabId){
+    currentTab = tabId;
+    
+    // Toggle active class on buttons
+    document.getElementById('btn-tab-ev').classList.toggle('active', tabId === 'ev');
+    document.getElementById('btn-tab-tells').classList.toggle('active', tabId === 'tells');
+    
+    // Toggle content visibility
+    document.getElementById('tab-content-ev').classList.toggle('active', tabId === 'ev');
+    document.getElementById('tab-content-tells').classList.toggle('active', tabId === 'tells');
+
+    updateStatusPill();
+}
+
+function updateStatusPill(){
+    if(currentTab === 'ev'){
+        const found = Object.values(state.evidence).filter(v=>v==="found").length;
+        const ruled = Object.values(state.evidence).filter(v=>v==="ruled").length;
+        dynamicStatusPill.textContent = `Found: ${found} • Ruled: ${ruled}`;
+    } else {
+        const seen = Object.values(state.tells).filter(v=>v==="seen").length;
+        const hard = TELLS.filter(t=>t.hardLock && state.tells[t.id]==="seen").length;
+        dynamicStatusPill.textContent = hard ? `Hard‑locks seen: ${hard}` : `Seen: ${seen}`;
+    }
+}
+
+function renderEvidence(){
+  evidenceRows.innerHTML = "";
+  const showTips = state.tips === "on";
+
+  updateStatusPill();
+
+  // Highlight active speed button
+  const speedNorm = document.getElementById('speedNormal');
+  const speedFast = document.getElementById('speedFast');
+  const speedSlow = document.getElementById('speedSlow');
+  if(speedNorm){
+      speedNorm.className = state.speed === 'normal' ? 'active good' : '';
+      speedFast.className = state.speed === 'fast' ? 'active warn' : '';
+      speedSlow.className = state.speed === 'slow' ? 'active warn' : '';
+  }
+
+  for(const e of EVIDENCE){
+    const v = state.evidence[e.id];
+    const el = document.createElement("div");
+    el.className = "ev-card";
+    el.innerHTML = `
+      <div class="ev-top">
+        <div style="min-width:0">
+          <div class="ev-name">${escapeHtml(e.label)}</div>
+          <div class="ev-how" style="display:${showTips?'block':'none'}">${escapeHtml(e.how)}</div>
+        </div>
+        <div class="seg" role="group" aria-label="${escapeHtml(e.label)}">
+          <button data-kind="evidence" data-id="${e.id}" data-val="found" class="${v==='found'?'active good':''}">Found</button>
+          <button data-kind="evidence" data-id="${e.id}" data-val="unknown" class="${v==='unknown'?'active neutral':''}">Unknown</button>
+          <button data-kind="evidence" data-id="${e.id}" data-val="ruled" class="${v==='ruled'?'active bad':''}">Ruled out</button>
+        </div>
+      </div>
+    `;
+    evidenceRows.appendChild(el);
+  }
+}
+
+function renderGhostProfile(ghostName, cands, targetEl, badgeEl){
+  const g = GHOSTS.find(x=>x.name===ghostName);
+  if(!g){
+    targetEl.innerHTML = `<div class="tiny">No ghost selected.</div>`;
+    if(badgeEl) badgeEl.textContent = "—";
+    return;
+  }
+
+  // Evidence status for this ghost
+  const evLines = g.evidence.map(ev=>{
+    const lbl = labelForEvidence(ev);
+    const st = state.evidence[ev];
+    const tag = st==="found" ? `<span class="mini-tag good">Found</span>` : st==="ruled" ? `<span class="mini-tag bad">Ruled</span>` : `<span class="mini-tag neutral">Unknown</span>`;
+    return `<div class="kv"><span>${escapeHtml(lbl)}</span><span>${tag}</span></div>`;
+  }).join("");
+
+  // Next checks for this ghost (unknown tells that include it)
+  const next = computeGhostNextChecks(ghostName, cands);
+  const nextLines = next.length ? next.map(o=>{
+    const t = TELLS.find(x=>x.id===o.id);
+    return `
+      <div class="step" style="margin-top:10px;">
+        <div class="step-title">${escapeHtml(t.title)}${t.hardLock?` <span class="mini-tag hard">Hard‑lock</span>`:""}</div>
+        <div class="step-desc">${state.tips==="on" ? `<b>What it means:</b> ${escapeHtml(t.meaning)}<br><b>How:</b> ${escapeHtml(t.how)}<br><span style="color:var(--muted2)">Splits ~ ${o.yes} vs ${o.no}.</span>` : `Splits ~ ${o.yes} vs ${o.no}.`}</div>
+        <div class="step-actions">
+          <button class="mini good" data-kind="tell" data-id="${t.id}" data-val="seen">Seen</button>
+          <button class="mini bad" data-kind="tell" data-id="${t.id}" data-val="ruled">Ruled out</button>
+          <button class="mini neutral" data-kind="open-tells">Open tells</button>
+        </div>
+      </div>
+    `;
+  }).join("") : `<div class="tiny">No remaining “signature” tells for this ghost right now.</div>`;
+
+  const strengths = (g.strengths||[]).map(s=>`<li>${escapeHtml(s)}</li>`).join("");
+  const weaknesses = (g.weaknesses||[]).map(s=>`<li>${escapeHtml(s)}</li>`).join("");
+
+  targetEl.innerHTML = `
+    <div class="section">
+      <h4>${escapeHtml(g.name)}</h4>
+      <div class="tiny">Evidence + signature checks to confirm.</div>
+    </div>
+
+    <div class="section">
+      <h4>Evidence (this ghost)</h4>
+      <div class="kv-list">${evLines}</div>
+    </div>
+
+    <div class="section">
+      <h4>Next to confirm</h4>
+      ${nextLines}
+    </div>
+
+    <div class="section">
+      <h4>Strengths</h4>
+      <ul class="bullets">${strengths || "<li>—</li>"}</ul>
+    </div>
+
+    <div class="section">
+      <h4>Weaknesses</h4>
+      <ul class="bullets">${weaknesses || "<li>—</li>"}</ul>
+    </div>
+  `;
+
+  if(badgeEl) badgeEl.textContent = g.evidence.map(labelForEvidence).join(" • ");
+}
+
+function renderMostLikely(cands){
+  const best = cands[0] || null;
+  const second = cands[1] || null;
+
+  // Candidate strip (click to swap the profile below)
+  if(candRankEl){
+    candRankEl.innerHTML = "";
+    if(cands.length){
+      const percents = scoreToPercents(cands).map(p=>Math.round(p));
+      const valid = new Set(cands.map(c=>c.ghost.name));
+      const selected = (state.ui.selectedGhost && valid.has(state.ui.selectedGhost)) ? state.ui.selectedGhost : cands[0].ghost.name;
+      state.ui.selectedGhost = selected;
+
+      for(let i=0;i<cands.length;i++){
+        const name = cands[i].ghost.name;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "cand-rank-btn" + (name===selected ? " active" : "");
+        btn.setAttribute("data-kind","pick-ghost");
+        btn.setAttribute("data-ghost", name);
+        btn.innerHTML = `<span>${escapeHtml(name)}</span><span class="cand-rank-pct">${percents[i]}%</span>`;
+        candRankEl.appendChild(btn);
+      }
+    }else{
+      candRankEl.innerHTML = `<span class="tiny">No candidates yet.</span>`;
+    }
+  }
+
+  if(!best){
+    topBadgeEl.textContent = "—";
+    topBadgeEl.className = "pill";
+    confidencePill.textContent = `0 candidates • ${vibeFromCount(0)}`;
+    mostLikelyEl.innerHTML = `<div class="tiny">Add evidence or tells to get candidates.</div>`;
+    return;
+  }
+
+  const conf = scoreToVibe(best.score, second ? second.score : null);
+  topBadgeEl.textContent = `Top: ${best.ghost.name} • ${conf}`;
+  topBadgeEl.className = `pill ${cands.length<=3 ? "good" : cands.length<=8 ? "warn" : ""}`.trim();
+  confidencePill.textContent = `${cands.length} candidate${cands.length===1?"":"s"} • ${vibeFromCount(cands.length)}`;
+
+  const valid = new Set(cands.map(c=>c.ghost.name));
+  const selected = (state.ui.selectedGhost && valid.has(state.ui.selectedGhost)) ? state.ui.selectedGhost : best.ghost.name;
+  state.ui.selectedGhost = selected;
+
+  renderGhostProfile(selected, cands, mostLikelyEl, null);
+}
+
+function renderSteps(cands){
+  stepsEl.innerHTML = "";
+  const hardLock = (cands.length === 1);
+
+  const steps = [];
+
+  const bestEvidence = computeBestEvidenceChecks(cands);
+  const signatureChecks = computePrioritySignatureChecks(cands);
+  const bestTells = computeBestTellChecks(cands);
+
+  // Prioritize signature checks first when close
+  const signatureFirst = signatureChecks.slice(0,2);
+  for(const opt of signatureFirst){
+    const t = TELLS.find(x=>x.id===opt.id);
+    steps.push({
+      title:`Confirm/deny: ${t.title}${t.hardLock ? " (Hard‑lock)" : ""}`,
+      desc: (state.tips==="on")
+        ? `<b>What it means:</b> ${escapeHtml(t.meaning)}<br><b>How:</b> ${escapeHtml(t.how)}<br><span style="color:var(--muted2)">Splits ~ ${opt.yes} vs ${opt.no}.</span>`
+        : `Splits ~ ${opt.yes} vs ${opt.no}.`,
+      actions:[
+        {label:"Seen", cls:"good", kind:"tell", id:t.id, val:"seen"},
+        {label:"Ruled out", cls:"bad", kind:"tell", id:t.id, val:"ruled"},
+        {label:"Open tells", cls:"neutral", kind:"open-tells", id:"", val:""},
+      ]
+    });
+  }
+
+  for(const opt of bestEvidence.slice(0,2)){
+    const ev = evidenceById(opt.id);
+    if(!ev) continue;
+    steps.push({
+      title:`Check evidence: ${ev.label}`,
+      desc: state.tips==="on" ? escapeHtml(ev.how) : `Try to confirm/deny this evidence.`,
+      actions:[
+        {label:"Found", cls:"good", kind:"evidence", id:ev.id, val:"found"},
+        {label:"Ruled out", cls:"bad", kind:"evidence", id:ev.id, val:"ruled"},
+      ]
+    });
+  }
+
+  // If nothing else, add generic best tells
+  if(!hardLock && steps.length < 2){
+    for(const opt of bestTells.slice(0,2)){
+      const t = TELLS.find(x=>x.id===opt.id);
+      steps.push({
+        title:`Try test: ${t.title}`,
+        desc: state.tips==="on" ? `<b>What it means:</b> ${escapeHtml(t.meaning)}<br><b>How:</b> ${escapeHtml(t.how)}` : `Try this test.`,
+        actions:[
+          {label:"Seen", cls:"good", kind:"tell", id:t.id, val:"seen"},
+          {label:"Ruled out", cls:"bad", kind:"tell", id:t.id, val:"ruled"},
+          {label:"Open tells", cls:"neutral", kind:"open-tells", id:"", val:""},
+        ]
+      });
+    }
+  }
+
+  const take = steps.slice(0,4); // Increased to 4 since we have more horizontal space now
+  statusPillEl.textContent = take.length ? `Next: ${take.length} step${take.length===1?"":"s"}` : "—";
+
+  for(const s of take){
+    const el = document.createElement("div");
+    el.className = "step";
+    el.innerHTML = `
+      <div class="step-title">${s.title}</div>
+      <div class="step-desc">${s.desc}</div>
+      <div class="step-actions">
+        ${s.actions.map(a=>{
+          if(a.kind === "open-tells") return `<button class="mini neutral" data-kind="open-tells">Open tells</button>`;
+          return `<button class="mini ${a.cls}" data-kind="${a.kind}" data-id="${a.id}" data-val="${a.val}">${a.label}</button>`;
+        }).join("")}
+      </div>
+    `;
+    stepsEl.appendChild(el);
+  }
+}
+
+function renderInlineTells(){
+  const q = (tellSearchInline.value || "").trim().toLowerCase();
+  updateStatusPill();
+
+  tellAccordionsInline.innerHTML = "";
+  const filtered = TELLS.filter(t=>{
+    if(!q) return true;
+    return (t.title + " " + t.cat + " " + t.meaning + " " + t.how + " " + (t.lockGhosts||[]).join(" ")).toLowerCase().includes(q);
+  });
+
+  const groups = new Map();
+  for(const t of filtered){
+    const key = tellCategoryName(t.cat);
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  }
+
+  const order = Array.from(groups.keys()).sort((a,b)=> a.localeCompare(b));
+  const showTips = state.tips === "on";
+
+  for(const cat of order){
+    const list = groups.get(cat);
+    const details = document.createElement("details");
+    details.className = "accordion";
+    details.open = /Speed/i.test(cat);
+
+    details.innerHTML = `
+      <summary>
+        <span>${escapeHtml(cat)}</span>
+        <span class="acc-meta">${list.length} tests</span>
+      </summary>
+      <div class="acc-body"></div>
+    `;
+
+    const body = details.querySelector(".acc-body");
+    for(const t of list){
+      const v = state.tells[t.id];
+      const tags = [];
+      if(t.hardLock) tags.push(`<span class="mini-tag hard">Hard‑lock</span>`);
+      const tip = showTips ? `<b>What it means:</b> ${escapeHtml(t.meaning)}<br><b>How to test:</b> ${escapeHtml(t.how)}` : "";
+
+      const row = document.createElement("div");
+      row.className = "tell-row";
+      row.innerHTML = `
+        <div class="tell-left">
+          <div class="tell-title">${escapeHtml(t.title)}</div>
+          <div class="tagline">${tags.join("")}</div>
+          <div class="tell-tip" style="display:${showTips?'block':'none'}">${tip}</div>
+        </div>
+        <div class="seg" role="group" aria-label="${escapeHtml(t.title)}">
+          <button data-kind="tell" data-id="${t.id}" data-val="seen" class="${v==='seen'?'active good':''}">Seen</button>
+          <button data-kind="tell" data-id="${t.id}" data-val="unknown" class="${v==='unknown'?'active neutral':''}">Unknown</button>
+          <button data-kind="tell" data-id="${t.id}" data-val="ruled" class="${v==='ruled'?'active bad':''}">Ruled out</button>
+        </div>
+      `;
+      body.appendChild(row);
+    }
+
+    tellAccordionsInline.appendChild(details);
+  }
+}
+
+function renderGhostGuide(cands){
+  const view = guideView.value;
+  const q = (ghostSearch.value || "").trim().toLowerCase();
+
+  candCountPill.textContent = `${cands.length} candidate${cands.length===1?"":"s"}`;
+
+  let list = [];
+  if(view === "all"){
+    list = GHOSTS.map(g=>{
+      const c = cands.find(x=>x.ghost.name===g.name);
+      return { ghost:g, score: c ? c.score : 0, inCandidates: !!c };
+    });
+    list.sort((a,b)=> (b.inCandidates - a.inCandidates) || (b.score - a.score) || a.ghost.name.localeCompare(b.ghost.name));
+  }else{
+    list = cands.slice();
+  }
+  if(q) list = list.filter(x=>x.ghost.name.toLowerCase().includes(q));
+  guideCount.textContent = view==="all" ? `All ghosts (${list.length})` : `Candidates (${list.length})`;
+
+  guideList.innerHTML = "";
+  for(const c of list){
+    const active = (state.ui.selectedGhost === c.ghost.name);
+    const el = document.createElement("div");
+    el.className = "cand" + (active ? " active" : "");
+    el.setAttribute("data-ghost", c.ghost.name);
+    el.innerHTML = `
+      <div class="cand-top">
+        <div class="title">${escapeHtml(c.ghost.name)}</div>
+        <div class="score">${c.score || "—"}</div>
+      </div>
+      <div class="chips">
+        ${c.ghost.evidence.map(ev => `<span class="chip"><span class="tag">E</span>${escapeHtml(labelForEvidence(ev))}</span>`).join("")}
+        ${c.ghost.extraOrbs ? `<span class="chip"><span class="tag">+</span>Orbs (extra)</span>` : ``}
+        ${view==="all" ? (c.inCandidates ? `<span class="chip"><span class="tag">✓</span>Candidate</span>` : `<span class="chip"><span class="tag">•</span>Not candidate</span>`) : ``}
+      </div>
+    `;
+    guideList.appendChild(el);
+  }
+
+  const chosen = state.ui.selectedGhost || (cands[0] ? cands[0].ghost.name : "");
+  if(chosen){
+    renderGhostProfile(chosen, cands, ghostInfo, midBadge);
+  }else{
+    ghostInfo.innerHTML = `<div class="tiny">No candidates yet.</div>`;
+    midBadge.textContent = "—";
+  }
+}
+
+function renderTellsOverlay(){
+  const q = (tellSearchEl.value || "").trim().toLowerCase();
+  tellAccordions.innerHTML = "";
+
+  const filtered = TELLS.filter(t=>{
+    if(!q) return true;
+    return (t.title + " " + t.cat + " " + t.meaning + " " + t.how + " " + (t.lockGhosts||[]).join(" ")).toLowerCase().includes(q);
+  });
+
+  const groups = new Map();
+  for(const t of filtered){
+    const key = tellCategoryName(t.cat);
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  }
+
+  const order = Array.from(groups.keys()).sort((a,b)=> a.localeCompare(b));
+  const showTips = state.tips === "on";
+
+  for(const cat of order){
+    const list = groups.get(cat);
+    const details = document.createElement("details");
+    details.className = "accordion";
+    details.open = /Speed/i.test(cat);
+
+    details.innerHTML = `
+      <summary>
+        <span>${escapeHtml(cat)}</span>
+        <span class="acc-meta">${list.length} tests</span>
+      </summary>
+      <div class="acc-body"></div>
+    `;
+
+    const body = details.querySelector(".acc-body");
+    for(const t of list){
+      const v = state.tells[t.id];
+      const tags = [];
+      if(t.hardLock) tags.push(`<span class="mini-tag hard">Hard‑lock</span>`);
+      const tip = showTips ? `<b>What it means:</b> ${escapeHtml(t.meaning)}<br><b>How to test:</b> ${escapeHtml(t.how)}` : "";
+
+      const row = document.createElement("div");
+      row.className = "tell-row";
+      row.innerHTML = `
+        <div class="tell-left">
+          <div class="tell-title">${escapeHtml(t.title)}</div>
+          <div class="tagline">${tags.join("")}</div>
+          <div class="tell-tip" style="display:${showTips?'block':'none'}">${tip}</div>
+        </div>
+        <div class="seg" role="group" aria-label="${escapeHtml(t.title)}">
+          <button data-kind="tell" data-id="${t.id}" data-val="seen" class="${v==='seen'?'active good':''}">Seen</button>
+          <button data-kind="tell" data-id="${t.id}" data-val="unknown" class="${v==='unknown'?'active neutral':''}">Unknown</button>
+          <button data-kind="tell" data-id="${t.id}" data-val="ruled" class="${v==='ruled'?'active bad':''}">Ruled out</button>
+        </div>
+      `;
+      body.appendChild(row);
+    }
+
+    tellAccordions.appendChild(details);
+  }
+}
+
+function render(){
+  renderEvidence();
+  const cands = getCandidates();
+  renderMostLikely(cands);
+  renderInlineTells();
+  renderSteps(cands);
+}
+
+/* Events */
+document.addEventListener("click", (e)=>{
+  const node = e.target.closest("button, .cand, .chip");
+  if(!node) return;
+
+  if(node.matches("button[data-kind='evidence']")){
+    setEvidence(node.dataset.id, node.dataset.val);
+    return;
+  }
+  if(node.matches("button[data-kind='tell']")){
+    setTell(node.dataset.id, node.dataset.val);
+    return;
+  }
+  if(node.matches("button[data-kind='pick-ghost']")){
+    state.ui.selectedGhost = node.dataset.ghost;
+    saveState();
+    const cands = getCandidates();
+    renderMostLikely(cands);
+    return;
+  }
+  if(node.matches("button[data-kind='rank-pick']")){
+    state.ui.rankSelectedGhost = node.dataset.ghost;
+    state.ui.selectedGhost = node.dataset.ghost;
+    saveState();
+    const cands = getCandidates();
+    renderRankOverlay(cands);
+    renderMostLikely(cands);
+    return;
+  }
+  if(node.matches("button[data-kind='speed']")){
+      setSpeed(node.dataset.val);
+      return;
+  }
+  if(node.id === "clearSpeedBtn"){
+      state.speed = "unknown";
+      saveState();
+      render();
+      return;
+  }
+
+  if(node.classList.contains("cand")){
+    state.ui.selectedGhost = node.getAttribute("data-ghost");
+    saveState();
+    renderGhostGuide(getCandidates());
+    return;
+  }
+
+  if(node.matches(".chip[data-kind='open-ghost-guide']")){
+    openGhostGuide();
+    return;
+  }
+  if(node.matches("button[data-kind='open-tells'], .chip[data-kind='open-tells']")){
+    openTells();
+    return;
+  }
+});
+
+modeEl.addEventListener("change", ()=>{ state.mode = modeEl.value; saveState(); render(); });
+tipsEl.addEventListener("change", ()=>{ state.tips = tipsEl.value; saveState(); render(); });
+
+tellSearchInline.addEventListener("input", ()=>{ state.ui.tellSearch = tellSearchInline.value || ""; tellSearchEl.value = state.ui.tellSearch; saveState(); renderInlineTells(); });
+tellSearchEl.addEventListener("input", ()=>{ state.ui.tellSearch = tellSearchEl.value || ""; tellSearchInline.value = state.ui.tellSearch; saveState(); renderTellsOverlay(); });
+
+// Updated Jump Button: Switches tab instead of scrolling
+jumpTellsBtn.addEventListener("click", ()=> {
+    switchTab('tells');
+    tellSearchInline.focus();
+});
+
+ghostGuideBtn.addEventListener("click", openGhostGuide);
+closeGhost.addEventListener("click", closeGhostGuide);
+ghostOverlay.addEventListener("click", (e)=>{ if(e.target === ghostOverlay) closeGhostGuide(); });
+guideView.addEventListener("change", ()=> renderGhostGuide(getCandidates()));
+ghostSearch.addEventListener("input", ()=> renderGhostGuide(getCandidates()));
+
+closeTells.addEventListener("click", closeTellsOverlay);
+tellsOverlay.addEventListener("click", (e)=>{ if(e.target === tellsOverlay) closeTellsOverlay(); });
+
+document.addEventListener("keydown", (e)=>{
+  if(e.key === "Escape" && tellsOverlay.classList.contains("open")) closeTellsOverlay();
+  if(e.key === "Escape" && ghostOverlay.classList.contains("open")) closeGhostGuide();
+  if((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "k")){
+    e.preventDefault();
+    openTells();
+  }
+});
+
+resetBtn.addEventListener("click", ()=>{
+  state = DEFAULT_STATE();
+  modeEl.value = state.mode;
+  tipsEl.value = state.tips;
+  tellSearchEl.value = "";
+  tellSearchInline.value = "";
+  saveState();
+  history.replaceState({}, "", location.pathname);
+  render();
+});
+
+copyBtn.addEventListener("click", async ()=>{
+  const payload = { mode: state.mode, tips: state.tips, evidence: state.evidence, tells: state.tells, ui:{ selectedGhost: state.ui.selectedGhost }, speed: state.speed };
+  const packed = btoa(JSON.stringify(payload));
+  const base = location.href.split("?")[0];
+  const url = `${base}?s=${encodeURIComponent(packed)}`;
+  try{
+    await navigator.clipboard.writeText(url);
+    copyBtn.textContent = "Copied!";
+    setTimeout(()=> copyBtn.textContent = "Copy share link", 900);
+  }catch{
+    copyBtn.textContent = "Copy failed";
+    setTimeout(()=> copyBtn.textContent = "Copy share link", 1200);
+  }
+});
+
+/* Apply share state from URL, then render */
+
+// Open candidate ranking overlay by clicking the confidence/candidate pill or the top badge
+if(confidencePill){ confidencePill.addEventListener("click", openRankOverlay); }
+if(topBadgeEl){ topBadgeEl.addEventListener("click", openRankOverlay); }
+if(closeRank){ closeRank.addEventListener("click", closeRankOverlay); }
+if(rankOverlay){ rankOverlay.addEventListener("click", (e)=>{ if(e.target === rankOverlay) closeRankOverlay(); }); }
+
+applyStateFromQuery();
+render();
+
+</script>
+</body>
+</html>
